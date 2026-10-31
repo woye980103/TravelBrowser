@@ -1,0 +1,59 @@
+name: Build TravelBrowser APK
+
+on:
+workflow_dispatch:
+push:
+paths:
+- 'TravelBrowser.zip'
+- '.github/workflows/android.yml'
+
+jobs:
+build:
+runs-on: ubuntu-latest
+
+steps:
+  - name: Checkout repository
+    uses: actions/checkout@v4
+
+  - name: Extract Android project
+    run: |
+      unzip -o TravelBrowser.zip -d extracted
+      find extracted -maxdepth 3 -type f | head -100
+
+  - name: Locate Gradle project
+    run: |
+      ROOT=$(find extracted -name settings.gradle.kts -type f | head -1 | xargs dirname)
+      if [ -z "$ROOT" ]; then
+        ROOT=$(find extracted -name settings.gradle -type f | head -1 | xargs dirname)
+      fi
+      if [ -z "$ROOT" ]; then
+        echo "Cannot find Android Gradle project"
+        exit 1
+      fi
+      echo "PROJECT_ROOT=$ROOT" >> "$GITHUB_ENV"
+
+  - name: Set up JDK
+    uses: actions/setup-java@v4
+    with:
+      distribution: temurin
+      java-version: '17'
+
+  - name: Set up Android SDK
+    uses: android-actions/setup-android@v3
+
+  - name: Build debug APK
+    run: |
+      cd "$PROJECT_ROOT"
+      if [ ! -f gradlew ]; then
+        echo "Gradle wrapper missing"
+        exit 1
+      fi
+      chmod +x gradlew
+      ./gradlew assembleDebug
+
+  - name: Upload APK
+    uses: actions/upload-artifact@v4
+    with:
+      name: TravelBrowser-debug-apk
+      path: '**/build/outputs/apk/debug/*.apk'
+      if-no-files-found: error
