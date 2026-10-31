@@ -1,6 +1,6 @@
 name: Build TravelBrowser APK
 
-'on':
+on:
   workflow_dispatch:
   push:
     paths:
@@ -13,25 +13,25 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Extract Android project
         run: |
-          unzip -o TravelBrowser.zip -d extracted
+          unzip -q TravelBrowser.zip -d extracted
 
       - name: Locate Gradle project
         run: |
-          ROOT=$(find extracted -name settings.gradle -type f -printf '%h\n' | head -1)
-          if [ -z "$ROOT" ]; then
-            ROOT=$(find extracted -name settings.gradle.kts -type f -printf '%h\n' | head -1)
-          fi
-          if [ -z "$ROOT" ]; then
+          FILE=$(find extracted -type f -name settings.gradle.kts -print -quit)
+          if [ -z "$FILE" ]; then
             echo "Cannot find Android Gradle project"
             exit 1
           fi
+          ROOT=$(dirname "$FILE")
           echo "PROJECT_ROOT=$ROOT" >> "$GITHUB_ENV"
+          echo "Found project: $ROOT"
 
       - name: Set up JDK
         uses: actions/setup-java@v4
@@ -42,17 +42,17 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
-         packages: 'platform-tools'
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
 
       - name: Build debug APK
         run: |
           cd "$PROJECT_ROOT"
-          if [ ! -f gradlew ]; then
-            echo "Gradle wrapper missing"
-            exit 1
-          fi
-          chmod +x gradlew
-          ./gradlew assembleDebug
+          gradle --no-daemon assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
